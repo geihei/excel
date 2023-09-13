@@ -12,8 +12,6 @@ interface Props
     readonly validatedSelection?: SelectionRange;
 }
 
-let globalInputID = 0;
-
 /** @category Renderers */
 export const GrowingEntry: React.FunctionComponent<Props> = (props: Props) => {
     const { placeholder, value, onKeyDown, highlight, altNewline, validatedSelection, ...rest } = props;
@@ -24,9 +22,6 @@ export const GrowingEntry: React.FunctionComponent<Props> = (props: Props) => {
     const useText = value ?? "";
 
     assert(onChange !== undefined, "GrowingEntry must be a controlled input area");
-
-    // 10 million id's aught to be enough for anybody
-    const [inputID] = React.useState(() => "input-box-" + (globalInputID = (globalInputID + 1) % 10_000_000));
 
     React.useEffect(() => {
         const ta = inputRef.current;
@@ -62,7 +57,6 @@ export const GrowingEntry: React.FunctionComponent<Props> = (props: Props) => {
             <InputBox
                 {...rest}
                 className={(className ?? "") + " gdg-input"}
-                id={inputID}
                 ref={inputRef}
                 onKeyDown={onKeyDownInner}
                 value={useText}

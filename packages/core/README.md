@@ -14,14 +14,14 @@
 
 [![Version](https://img.shields.io/npm/v/@glideapps/glide-data-grid?color=blue&label=latest&style=for-the-badge)](https://github.com/glideapps/glide-data-grid/releases)
 [![React 16+](https://img.shields.io/badge/React-16+-00ADD8?style=for-the-badge&logo=react)](https://reactjs.org)
-[![Code Coverage](https://img.shields.io/coverallsCoverage/github/glideapps/glide-data-grid?color=457aba&label=Cover&style=for-the-badge)](https://coveralls.io/github/glideapps/glide-data-grid)
+[![Code Coverage](https://img.shields.io/coveralls/github/glideapps/glide-data-grid?color=457aba&label=Cover&style=for-the-badge)](https://coveralls.io/github/glideapps/glide-data-grid)
 [![npm bundle size](https://img.shields.io/bundlephobia/minzip/@glideapps/glide-data-grid?color=success&label=bundle&style=for-the-badge)](https://bundlephobia.com/package/@glideapps/glide-data-grid)
 [![License](https://img.shields.io/github/license/glideapps/glide-data-grid?color=red&style=for-the-badge)](https://github.com/glideapps/glide-data-grid/blob/main/LICENSE)
 [![Made By Glide](https://img.shields.io/badge/❤_Made_by-Glide-11CCE5?style=for-the-badge&logo=none)](https://www.glideapps.com/jobs)
 
 # 👩‍💻 Demo and features
 
-Lot's of fun examples are in our [Storybook](https://quicktype.github.io/glide-data-grid).
+Lot's of fun examples are in our [Storybook](https://glideapps.github.io/glide-data-grid).
 
 You can also visit our [main site](https://grid.glideapps.com).
 
@@ -80,7 +80,7 @@ Last provide data to the grid
 // If fetching data is slow you can use the DataEditor ref to send updates for cells
 // once data is loaded.
 function getData([col, row]: Item): GridCell {
-    const person = data[row];
+    const person = getData(row);
 
     if (col === 0) {
         return {
@@ -128,7 +128,7 @@ Data Grid is agnostic about the way you load/store/generate/mutate your data. Wh
 
 **Does it do sorting, searching, and filtering?**
 
-Search is included. You provide the trigger, we do the search. [Example](https://quicktype.github.io/glide-data-grid/?path=/story/glide-data-grid-docs--search) in our storybook.
+Search is included. You provide the trigger, we do the search. [Example](https://glideapps.github.io/glide-data-grid/?path=/story/glide-data-grid-docs--search) in our storybook.
 
 Filtering and sorting are something you would have to implement with your data source. There are hooks for adding column header menus if you want that.
 
@@ -140,7 +140,7 @@ Yes!
 
 **Can I render my own cells?**
 
-Yes, but the renderer has to use HTML Canvas. [Simple example](https://quicktype.github.io/glide-data-grid/?path=/story/glide-data-grid-dataeditor-demos--draw-custom-cells) in our Storybook.
+Yes, but the renderer has to use HTML Canvas. [Simple example](https://glideapps.github.io/glide-data-grid/?path=/story/glide-data-grid-dataeditor-demos--draw-custom-cells) in our Storybook.
 
 **Why does Data Grid use HTML Canvas?**
 

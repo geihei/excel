@@ -46,17 +46,6 @@ const closeX = (
 
 export interface DataGridSearchProps extends Omit<ScrollingDataGridProps, "prelightCells"> {
     readonly getCellsForSelection?: (selection: Rectangle, abortSignal: AbortSignal) => GetCellsThunk | CellArray;
-
-    /**
-     * The search results to display. If not provided glide will use its own internal search provider.
-     */
-    readonly searchResults?: readonly Item[];
-
-    /**
-     * Emitted whenever the search results for the current search field changes.
-     * @param results The new search results
-     * @param navIndex  The currents selected search result
-     */
     readonly onSearchResultsChanged?: (results: readonly Item[], navIndex: number) => void;
     /**
      * Controls the visibility of the search overlay.
@@ -68,17 +57,6 @@ export interface DataGridSearchProps extends Omit<ScrollingDataGridProps, "preli
      * @group Search
      */
     readonly onSearchClose?: () => void;
-    /**
-     * The current search value.
-     * @group Search
-     */
-    readonly searchValue?: string;
-    /**
-     * Emitted when the search value changes.
-     * @group Search
-     * @param newVal The new search value
-     */
-    readonly onSearchValueChange?: (newVal: string) => void;
     readonly searchInputRef: React.MutableRefObject<HTMLInputElement | null>;
 }
 
@@ -91,9 +69,6 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
         rows,
         columns,
         searchInputRef,
-        searchValue,
-        searchResults: searchResultsIn,
-        onSearchValueChange,
         getCellsForSelection,
         onSearchResultsChanged,
         showSearch = false,
@@ -102,18 +77,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
 
     const [searchID] = React.useState(() => "search-box-" + Math.round(Math.random() * 1000));
 
-    const [searchStringInner, setSearchStringInner] = React.useState("");
-    const searchString = searchValue ?? searchStringInner;
-
-    // always emit both, this allows the user to spy on the search value without controlling it.
-    const setSearchString = React.useCallback(
-        (newVal: string) => {
-            setSearchStringInner(newVal);
-            onSearchValueChange?.(newVal);
-        },
-        [onSearchValueChange]
-    );
-
+    const [searchString, setSearchString] = React.useState("");
     const [searchStatus, setSearchStatus] =
         React.useState<{
             rowsSearched: number;
@@ -123,23 +87,10 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
 
     const searchStatusRef = React.useRef(searchStatus);
     searchStatusRef.current = searchStatus;
-    React.useEffect(() => {
-        if (searchResultsIn === undefined) return;
-        if (searchResultsIn.length > 0) {
-            setSearchStatus(cv => ({
-                rowsSearched: rows,
-                results: searchResultsIn.length,
-                selectedIndex: cv?.selectedIndex ?? -1,
-            }));
-        } else {
-            setSearchStatus(undefined);
-        }
-    }, [rows, searchResultsIn]);
 
     const abortControllerRef = React.useRef(new AbortController());
     const searchHandle = React.useRef<number>();
-    const [searchResultsInner, setSearchResultsInner] = React.useState<readonly Item[]>([]);
-    const searchResults = searchResultsIn ?? searchResultsInner;
+    const [searchResults, setSearchResults] = React.useState<readonly Item[]>([]);
 
     const cancelSearch = React.useCallback(() => {
         if (searchHandle.current !== undefined) {
@@ -165,7 +116,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
             let rowsSearched = 0;
 
             setSearchStatus(undefined);
-            setSearchResultsInner([]);
+            setSearchResults([]);
 
             const runningResult: [number, number][] = [];
 
@@ -225,7 +176,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
                 const tEnd = performance.now();
 
                 if (added) {
-                    setSearchResultsInner([...runningResult]);
+                    setSearchResults([...runningResult]);
                 }
 
                 rowsSearched += data.length;
@@ -265,7 +216,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
     const onClose = React.useCallback(() => {
         onSearchClose?.();
         setSearchStatus(undefined);
-        setSearchResultsInner([]);
+        setSearchResults([]);
         onSearchResultsChanged?.([], -1);
         cancelSearch();
         canvasRef?.current?.focus();
@@ -274,16 +225,15 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
     const onSearchChange = React.useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
             setSearchString(event.target.value);
-            if (searchResultsIn !== undefined) return;
             if (event.target.value === "") {
                 setSearchStatus(undefined);
-                setSearchResultsInner([]);
+                setSearchResults([]);
                 cancelSearch();
             } else {
                 beginSearch(event.target.value);
             }
         },
-        [beginSearch, cancelSearch, setSearchString, searchResultsIn]
+        [beginSearch, cancelSearch]
     );
 
     React.useEffect(() => {
@@ -291,7 +241,7 @@ const DataGridSearch: React.FunctionComponent<DataGridSearchProps> = p => {
             setSearchString("");
             searchInputRef.current.focus({ preventScroll: true });
         }
-    }, [showSearch, searchInputRef, setSearchString]);
+    }, [showSearch, searchInputRef]);
 
     const onNext = React.useCallback(
         (ev?: React.MouseEvent) => {

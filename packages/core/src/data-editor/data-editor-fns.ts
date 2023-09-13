@@ -203,9 +203,8 @@ export function decodeHTML(tableEl: HTMLTableElement): string[][] | undefined {
     return result;
 }
 
-function escape(str: string, actuallyEscape: boolean): string {
-    if (!actuallyEscape) return str;
-    if (/[\t\n",]/.test(str)) {
+function escape(str: string): string {
+    if (/[\t\n"]/.test(str)) {
         str = `"${str.replace(/"/g, '""')}"`;
     }
     return str;
@@ -226,108 +225,47 @@ const formatBoolean = (val: boolean | BooleanEmpty | BooleanIndeterminate): stri
             return "";
 
         default:
-            assertNever(val, `A boolean was formated with invalid type: ${typeof val}`);
+            assertNever(val);
     }
 };
-
-export function formatCell(
-    cell: GridCell,
-    index: number,
-    raw: boolean,
-    columnIndexes: readonly number[],
-    escapeValues: boolean
-) {
-    const colIndex = columnIndexes[index];
-    if (cell.span !== undefined && cell.span[0] !== colIndex) return "";
-    if (cell.copyData !== undefined) {
-        return escape(cell.copyData, escapeValues);
-    }
-    switch (cell.kind) {
-        case GridCellKind.Text:
-        case GridCellKind.Number:
-            return escape(raw ? cell.data?.toString() ?? "" : cell.displayData, escapeValues);
-        case GridCellKind.Markdown:
-        case GridCellKind.RowID:
-        case GridCellKind.Uri:
-            return escape(cell.data, escapeValues);
-        case GridCellKind.Image:
-        case GridCellKind.Bubble:
-            if (cell.data.length === 0) return "";
-            return cell.data.reduce((pv, cv) => `${escape(pv, escapeValues)},${escape(cv, escapeValues)}`);
-        case GridCellKind.Boolean:
-            return formatBoolean(cell.data);
-        case GridCellKind.Loading:
-            return raw ? "" : "#LOADING";
-        case GridCellKind.Protected:
-            return raw ? "" : "************";
-        case GridCellKind.Drilldown:
-            if (cell.data.length === 0) return "";
-            return cell.data
-                .map(i => i.text)
-                .reduce((pv, cv) => `${escape(pv, escapeValues)},${escape(cv, escapeValues)}`);
-        case GridCellKind.Custom:
-            return escape(cell.copyData, escapeValues);
-        default:
-            assertNever(cell, `A cell was passed with an invalid kind: ${(cell as any).kind}`);
-    }
-}
-
-export function formatForCopy(cells: readonly (readonly GridCell[])[], columnIndexes: readonly number[]): string {
-    return cells.map(row => row.map((a, b) => formatCell(a, b, false, columnIndexes, true)).join("\t")).join("\n");
-}
 
 export function copyToClipboard(
     cells: readonly (readonly GridCell[])[],
     columnIndexes: readonly number[],
     e?: ClipboardEvent
 ) {
-    const str = formatForCopy(cells, columnIndexes);
-
-    const styleTag = `<style type="text/css"><!--br {mso-data-placement:same-cell;}--></style>`;
-
-    // eslint-disable-next-line unicorn/consistent-function-scoping
-    const copyWithWriteText = (s: string) => {
-        void window.navigator.clipboard?.writeText(s);
-    };
-
-    const copyWithWrite = (s: string, html: string): boolean => {
-        if (window.navigator.clipboard?.write === undefined) return false;
-        void window.navigator.clipboard.write([
-            new ClipboardItem({
-                // eslint-disable-next-line sonarjs/no-duplicate-string
-                "text/plain": new Blob([s], { type: "text/plain" }),
-                "text/html": new Blob([`${styleTag}<table>${html}</table>`], {
-                    type: "text/html",
-                }),
-            }),
-        ]);
-        return true;
-    };
-
-    const copyWithClipboardData = (s: string, html: string) => {
-        try {
-            if (e === undefined || e.clipboardData === null) throw new Error("No clipboard data");
-
-            // The following formatting for the `formattedHtml` variable ensures that when pasting,
-            // spaces are preserved in both Google Sheets and Excel. This is done by:
-            // 1. Replacing tabs with four spaces for consistency. Also google sheets disallows any tabs.
-            // 2. Wrapping each space with a span element to prevent them from being collapsed or ignored during the
-            //    paste operation.
-            const formattedHtml = `${styleTag}<table>${html
-                .replace(/\t/g, "    ")
-                .replace(/ /g, "<span>&nbsp;</span>")}</table>`;
-
-            // This might fail if we had to await the thunk
-            e?.clipboardData?.setData("text/plain", s);
-            e?.clipboardData?.setData("text/html", formattedHtml);
-        } catch {
-            if (!copyWithWrite(s, html)) {
-                copyWithWriteText(s);
-            }
+    const formatCell = (cell: GridCell, index: number, raw: boolean): string => {
+        const colIndex = columnIndexes[index];
+        if (cell.span !== undefined && cell.span[0] !== colIndex) return "";
+        switch (cell.kind) {
+            case GridCellKind.Text:
+            case GridCellKind.Number:
+                return escape(raw ? cell.data?.toString() ?? "" : cell.displayData);
+            case GridCellKind.Markdown:
+            case GridCellKind.RowID:
+            case GridCellKind.Uri:
+                return escape(cell.data);
+            case GridCellKind.Image:
+            case GridCellKind.Bubble:
+                return cell.data.reduce((pv, cv) => `${escape(pv)},${escape(cv)}`);
+            case GridCellKind.Boolean:
+                return formatBoolean(cell.data);
+            case GridCellKind.Loading:
+                return raw ? "" : "#LOADING";
+            case GridCellKind.Protected:
+                return raw ? "" : "************";
+            case GridCellKind.Drilldown:
+                return cell.data.map(i => i.text).reduce((pv, cv) => `${escape(pv)},${escape(cv)}`);
+            case GridCellKind.Custom:
+                return escape(cell.copyData);
+            default:
+                assertNever(cell);
         }
     };
 
-    if (window.navigator.clipboard?.write !== undefined || e?.clipboardData !== undefined) {
+    const str = cells.map(row => row.map((a, b) => formatCell(a, b, false)).join("\t")).join("\n");
+
+    if (window.navigator.clipboard?.write !== undefined || e !== undefined) {
         const rootEl = document.createElement("tbody");
 
         for (const row of cells) {
@@ -341,16 +279,31 @@ export function copyToClipboard(
                     link.innerText = cell.data;
                     cellEl.append(link);
                 } else {
-                    cellEl.innerText = formatCell(cell, i, true, columnIndexes, false);
+                    cellEl.innerText = formatCell(cell, i, true);
                 }
                 rowEl.append(cellEl);
             }
 
             rootEl.append(rowEl);
         }
-        void copyWithClipboardData(str, rootEl.outerHTML);
+        if (window.navigator.clipboard?.write !== undefined) {
+            void window.navigator.clipboard.write([
+                new ClipboardItem({
+                    "text/plain": new Blob([str], { type: "text/plain" }),
+                    "text/html": new Blob([`<table>${rootEl.outerHTML}</table>`], { type: "text/html" }),
+                }),
+            ]);
+        } else if (e !== undefined && e?.clipboardData !== null) {
+            try {
+                // This might fail if we had to await the thunk
+                e.clipboardData.setData("text/plain", str);
+                e.clipboardData.setData("text/html", `<table>${rootEl.outerHTML}</table>`);
+            } catch {
+                void window.navigator.clipboard?.writeText(str);
+            }
+        }
     } else {
-        void copyWithWriteText(str);
+        void window.navigator.clipboard?.writeText(str);
     }
 
     e?.preventDefault();

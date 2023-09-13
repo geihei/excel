@@ -130,16 +130,6 @@ describe("data-grid", () => {
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
-        fireEvent.mouseUp(screen.getByTestId(dataGridCanvasId), {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        fireEvent.click(screen.getByTestId(dataGridCanvasId), {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
         expect(spy).toHaveBeenCalled();
         expect(spy).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -170,17 +160,7 @@ describe("data-grid", () => {
         const spy = jest.fn();
         render(<DataGrid {...basicProps} onMouseUp={spy} />);
 
-        fireEvent.mouseDown(screen.getByTestId(dataGridCanvasId), {
-            clientX: 300, // Col B
-            clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
-        });
-
         fireEvent.mouseUp(screen.getByTestId(dataGridCanvasId), {
-            clientX: 300, // Col B
-            clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
-        });
-
-        fireEvent.click(screen.getByTestId(dataGridCanvasId), {
             clientX: 300, // Col B
             clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
         });
@@ -241,30 +221,6 @@ describe("data-grid", () => {
                 location: [2, 5],
             })
         );
-    });
-
-    test("Cell is not hovered when target is not data grid", () => {
-        const spy = jest.fn();
-
-        render(
-            <>
-        <DataGrid {...basicProps} onItemHovered={spy} />
-        <div data-testid="outside-element" style={{
-            position: 'absolute',
-            width: '100vh',
-            height: '100vh',
-        }} />
-        </>
-        );
-
-
-        const outsideElement = screen.getByTestId('outside-element');
-        fireEvent.mouseMove(outsideElement, {
-            clientX: 350, // Col C
-            clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
-        });
-
-        expect(spy).not.toHaveBeenCalled()
     });
 
     test("Header hovered", () => {
@@ -354,17 +310,7 @@ describe("data-grid", () => {
         const spy = jest.fn();
         render(<DataGrid {...basicProps} freezeColumns={1} cellXOffset={3} onMouseUp={spy} />);
 
-        fireEvent.mouseDown(screen.getByTestId(dataGridCanvasId), {
-            clientX: 50, // Col A
-            clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
-        });
-
         fireEvent.mouseUp(screen.getByTestId(dataGridCanvasId), {
-            clientX: 50, // Col A
-            clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
-        });
-
-        fireEvent.click(screen.getByTestId(dataGridCanvasId), {
             clientX: 50, // Col A
             clientY: 36 + 32 * 5 + 16, // Row 5 (0 indexed)
         });

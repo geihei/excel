@@ -1,4 +1,3 @@
-import { getSquareWidth, getSquareXPosFromAlign, getSquareBB, pointIsWithinBB } from "../../common/utils";
 import { drawBoolean } from "../data-grid-lib";
 import {
     GridCellKind,
@@ -21,10 +20,6 @@ export function toggleBoolean(data: boolean | null | undefined): boolean | null 
     return data !== true;
 }
 
-const defaultCellMaxSize = 20;
-
-
-
 export const booleanCellRenderer: InternalCellRenderer<BooleanCell> = {
     getAccessibilityString: c => c.data?.toString() ?? "false",
     kind: GridCellKind.Boolean,
@@ -32,28 +27,18 @@ export const booleanCellRenderer: InternalCellRenderer<BooleanCell> = {
     useLabel: false,
     needsHoverPosition: true,
     measure: () => 50,
-    draw: a => drawBoolean(a, a.cell.data, booleanCellIsEditable(a.cell), a.cell.maxSize ?? defaultCellMaxSize),
+    draw: a => drawBoolean(a, a.cell.data, booleanCellIsEditable(a.cell)),
     onDelete: c => ({
         ...c,
         data: false,
     }),
     onClick: e => {
-        const { cell, posX: pointerX, posY: pointerY, bounds, theme } = e;
-        const { width, height, x: cellX, y: cellY } = bounds;
-        const maxWidth = cell.maxSize ?? defaultCellMaxSize;
-        const cellCenterY = Math.floor(bounds.y + height / 2);
-        const checkBoxWidth = getSquareWidth(maxWidth, height, theme.cellVerticalPadding);
-        const posX = getSquareXPosFromAlign(
-            cell.contentAlign ?? "center",
-            cellX,
-            width,
-            theme.cellHorizontalPadding,
-            checkBoxWidth
-        );
-        const bb = getSquareBB(posX, cellCenterY, checkBoxWidth);
-        const checkBoxClicked = pointIsWithinBB(cellX + pointerX, cellY + pointerY, bb);
-
-        if (booleanCellIsEditable(cell) && checkBoxClicked) {
+        const { cell, posX: x, posY: y, bounds } = e;
+        if (
+            booleanCellIsEditable(cell) &&
+            Math.abs(x - bounds.width / 2) <= bounds.height / 3.4 &&
+            Math.abs(y - bounds.height / 2) <= bounds.height / 3.4
+        ) {
             return {
                 ...cell,
                 data: toggleBoolean(cell.data),

@@ -397,7 +397,7 @@ Requests the data grid to scroll to a particular location. If only one direction
 ## appendRow
 
 ```ts
-appendRow: (col: number, openOverlay: boolean = true) => Promise<void>;
+appendRow: (col: number) => Promise<void>;
 ```
 
 Appends a row to the data grid.
@@ -506,29 +506,19 @@ onVisibleRegionChanged?: (range: Rectangle) => void;
 ## provideEditor
 
 ```ts
-export type ProvideEditorComponent<T extends InnerGridCell> = React.FunctionComponent<{
-    readonly onChange: (newValue: T) => void;
-    readonly onFinishedEditing: (newValue?: T, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => void;
+interface EditorProps {
+    readonly onChange: (newValue: GridCell) => void;
+    readonly onFinishedEditing: (newValue?: GridCell) => void;
     readonly isHighlighted: boolean;
-    readonly value: T;
-    readonly initialValue?: string;
-    readonly validatedSelection?: SelectionRange;
-    readonly imageEditorOverride?: ImageEditorType;
-    readonly markdownDivCreateNode?: (content: string) => DocumentFragment;
-    readonly target: Rectangle;
-    readonly forceEditMode: boolean;
-    readonly isValid?: boolean;
-}>;
+    readonly value: GridCell;
+}
 
-export type ProvideEditorCallbackResult<T extends InnerGridCell> =
-    | (ProvideEditorComponent<T> & {
+type ProvideEditorCallback = (cell: GridCell) =>
+    (React.FunctionComponent<EditorProps> & {
           disablePadding?: boolean;
           disableStyling?: boolean;
       })
-    | ObjectEditorCallbackResult<T>
     | undefined;
-
-export type ProvideEditorCallback<T extends InnerGridCell> = (cell: T) => ProvideEditorCallbackResult<T>;
 
 provideEditor?: ProvideEditorCallback<GridCell>;
 ```

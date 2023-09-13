@@ -1,4 +1,3 @@
 {
-    "eslint.workingDirectories": ["packages/core", "packages/cells", "packages/source"],
-    "typescript.tsdk": "node_modules/typescript/lib"
+    "eslint.workingDirectories": ["packages/core", "packages/cells", "packages/source"]
 }

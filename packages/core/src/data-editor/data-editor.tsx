@@ -104,10 +104,12 @@ type Props = Partial<
         | "onMouseDown"
         | "onMouseMove"
         | "onMouseUp"
+        | "onSearchResultsChanged"
         | "onVisibleRegionChanged"
         | "rowHeight"
         | "rows"
         | "scrollRef"
+        | "searchColOffset"
         | "searchInputRef"
         | "selectedColumns"
         | "selection"
@@ -296,18 +298,11 @@ export interface DataEditorProps extends Props {
      */
     readonly rows: number;
 
-    /** Determines if row markers should be automatically added to the grid.
-     * Interactive row markers allow the user to select a row.
-     *
-     * - "clickable-number" renders a number that can be clicked to
-     *   select the row
-     * - "both" causes the row marker to show up as a number but
-     *   reveal a checkbox when the marker is hovered.
-     *
+    /** Determins if row markers should be automatically added to the grid.
      * @defaultValue `none`
      * @group Style
      */
-    readonly rowMarkers?: "checkbox" | "number" | "clickable-number" | "checkbox-visible" | "both" | "none";
+    readonly rowMarkers?: "checkbox" | "number" | "clickable-number" | "both" | "none";
     /**
      * Sets the width of row markers in pixels, if unset row markers will automatically size.
      * @group Style
@@ -460,17 +455,11 @@ export interface DataEditorProps extends Props {
 
     /**
      * The current selection of the data grid. Contains all selected cells, ranges, rows, and columns.
-     * Used in conjunction with {@link onGridSelectionChange}
-     * method to implement a controlled selection.
      * @group Selection
      */
     readonly gridSelection?: GridSelection;
     /**
-     * Emitted whenever the grid selection changes. Specifying
-     * this function will make the grid’s selection controlled, so
-     * so you will need to specify {@link gridSelection} as well. See
-     * the "Controlled Selection" example for details.
-     *
+     * Emitted whenever the grid selection changes.
      * @param newSelection The new gridSelection as created by user input.
      * @group Selection
      */
@@ -523,8 +512,8 @@ export interface DataEditorProps extends Props {
      * Determins which keybindings are enabled.
      * @group Editing
      * @defaultValue is
-
-            {
+     
+            {  
                 selectAll: true,
                 selectRow: true,
                 selectColumn: true,
@@ -606,14 +595,6 @@ export interface DataEditorProps extends Props {
     readonly customRenderers?: readonly CustomRenderer<CustomCell<any>>[];
 
     readonly scaleToRem?: boolean;
-
-    /**
-     * Custom predicate function to decide whether the click event occurred outside the grid
-     * Especially used when custom editor is opened with the portal and is outside the grid, but there is no possibility
-     * to add a class "click-outside-ignore"
-     * If this function is supplied and returns false, the click event is ignored
-     */
-    readonly isOutsideClick?: (e: MouseEvent | TouchEvent) => boolean;
 }
 
 type ScrollToFn = (
@@ -635,7 +616,7 @@ export interface DataEditorRef {
      * @param col The column index to focus in the new row.
      * @returns A promise which waits for the append to complete.
      */
-    appendRow: (col: number, openOverlay?: boolean) => Promise<void>;
+    appendRow: (col: number) => Promise<void>;
     /**
      * Triggers cells to redraw.
      */
@@ -656,10 +637,6 @@ export interface DataEditorRef {
      * Scrolls to the desired cell or location in the grid.
      */
     scrollTo: ScrollToFn;
-    /**
-     * Causes the columns in the selection to have their natural size recomputed and re-emitted as a resize event.
-     */
-    remeasureColumns: (cols: CompactSelection) => void;
 }
 
 const loadingCell: GridCell = {
@@ -718,10 +695,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         onGroupHeaderRenamed,
         onCellEdited,
         onCellsEdited,
-        onSearchResultsChanged: onSearchResultsChangedIn,
-        searchResults,
-        onSearchValueChange,
-        searchValue,
         onKeyDown: onKeyDownIn,
         onKeyUp: onKeyUpIn,
         keybindings: keybindingsIn,
@@ -793,7 +766,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         headerHeight: headerHeightIn = 36,
         groupHeaderHeight: groupHeaderHeightIn = headerHeightIn,
         theme: themeIn,
-        isOutsideClick,
     } = p;
 
     const minColumnWidth = Math.max(minColumnWidthIn, 20);
@@ -873,8 +845,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         getCellsForSelectionIn,
         getCellContent,
         rowMarkerOffset,
-        abortControllerRef.current,
-        rows
+        abortControllerRef.current
     );
 
     const validateCell = React.useCallback<NonNullable<typeof validateCellIn>>(
@@ -1069,6 +1040,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const hasJustScrolled = React.useRef(false);
 
     const [visibleRegion, setVisibleRegion, empty] = useStateWithReactiveInput<VisibleRegion>(visibleRegionInput);
+    visibleRegionRef.current = visibleRegion;
 
     const vScrollReady = (visibleRegion.height ?? 1) > 1;
     React.useLayoutEffect(() => {
@@ -1155,7 +1127,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const mangledColsRef = React.useRef(mangledCols);
     mangledColsRef.current = mangledCols;
     const getMangledCellContent = React.useCallback(
-        ([col, row]: Item, forceStrict: boolean = false): InnerGridCell => {
+        ([col, row]: Item): InnerGridCell => {
             const isTrailing = showTrailingBlankRow && row === mangledRows - 1;
             const isRowMarkerCol = col === 0 && hasRowMarkers;
             if (isRowMarkerCol) {
@@ -1169,7 +1141,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     markerKind: rowMarkers === "clickable-number" ? "number" : rowMarkers,
                     row: rowMarkerStartIndex + row,
                     drawHandle: onRowMoved !== undefined,
-                    cursor: rowMarkers === "clickable-number" ? "pointer" : undefined,
                 };
             } else if (isTrailing) {
                 //If the grid is empty, we will return text
@@ -1192,7 +1163,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
             } else {
                 const outerCol = col - rowMarkerOffset;
-                if (forceStrict || experimental?.strict === true) {
+                if (experimental?.strict === true) {
                     const vr = visibleRegionRef.current;
                     const isOutsideMainArea =
                         vr.x > outerCol || outerCol > vr.x + vr.width || vr.y > row || row > vr.y + vr.height;
@@ -1384,7 +1355,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     }
 
                     const scrollBounds = canvas.getBoundingClientRect();
-                    const scale = scrollBounds.width / canvas.offsetWidth;
 
                     if (desiredX !== undefined) {
                         targetRect = {
@@ -1418,11 +1388,10 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             trailingRowHeight = typeof rowHeight === "number" ? rowHeight : rowHeight(rows);
                         }
 
-                        // scrollBounds is already scaled
-                        let sLeft = frozenWidth * scale + scrollBounds.left + rowMarkerOffset * rowMarkerWidth * scale;
+                        let sLeft = frozenWidth + scrollBounds.left + rowMarkerOffset * rowMarkerWidth;
                         let sRight = scrollBounds.right;
-                        let sTop = scrollBounds.top + totalHeaderHeight * scale;
-                        let sBottom = scrollBounds.bottom - trailingRowHeight * scale;
+                        let sTop = scrollBounds.top + totalHeaderHeight;
+                        let sBottom = scrollBounds.bottom - trailingRowHeight;
 
                         const minx = targetRect.width + paddingX * 2;
                         switch (options?.hAlign) {
@@ -1464,18 +1433,13 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             scrollY = bounds.y + bounds.height - sBottom;
                         }
 
-                        if (dir === "vertical" || (typeof col === "number" && col < freezeColumns)) {
+                        if (dir === "vertical" || col < freezeColumns) {
                             scrollX = 0;
                         } else if (dir === "horizontal") {
                             scrollY = 0;
                         }
 
                         if (scrollX !== 0 || scrollY !== 0) {
-                            // Remove scaling as scrollTo method is unaffected by transform scale.
-                            if (scale !== 1) {
-                                scrollX /= scale;
-                                scrollY /= scale;
-                            }
                             scrollRef.current.scrollTo(
                                 scrollX + scrollRef.current.scrollLeft,
                                 scrollY + scrollRef.current.scrollTop
@@ -1495,7 +1459,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     getCellContentRef.current = getCellContent;
     rowsRef.current = rows;
     const appendRow = React.useCallback(
-        async (col: number, openOverlay: boolean = true): Promise<void> => {
+        async (col: number): Promise<void> => {
             const c = mangledCols[col];
             if (c?.trailingRowOptions?.disabled === true) {
                 return;
@@ -1538,7 +1502,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 );
 
                 const cell = getCellContentRef.current([col - rowMarkerOffset, row]);
-                if (cell.allowOverlay && isReadWriteCell(cell) && cell.readonly !== true && openOverlay) {
+                if (cell.allowOverlay && isReadWriteCell(cell) && cell.readonly !== true) {
                     // wait for scroll to have a chance to process
                     window.setTimeout(() => {
                         focusCallback.current(col, row);
@@ -1820,21 +1784,20 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             themeForCell,
         ]
     );
-    const isActivelyDraggingHeader = React.useRef(false);
-    const lastMouseSelectLocation = React.useRef<readonly [number, number]>();
+
+    const lastMouseSelectLocation = React.useRef<[number, number]>();
     const touchDownArgs = React.useRef(visibleRegion);
     const mouseDownData =
         React.useRef<{
             wasDoubleClick: boolean;
             time: number;
-            button: number;
             location: Item;
         }>();
     const onMouseDown = React.useCallback(
         (args: GridMouseEventArgs) => {
             isPrevented.current = false;
             touchDownArgs.current = visibleRegionRef.current;
-            if (args.button !== 0 && args.button !== 1) {
+            if (args.button !== 0) {
                 mouseDownData.current = undefined;
                 return;
             }
@@ -1843,14 +1806,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const wasDoubleClick = time - (mouseDownData.current?.time ?? -1000) < 250;
             mouseDownData.current = {
                 wasDoubleClick,
-                button: args.button,
                 time,
                 location: args.location,
             };
-
-            if (args?.kind === "header") {
-                isActivelyDraggingHeader.current = true;
-            }
 
             const fh = args.kind === "cell" && args.isFillHandle;
 
@@ -1862,10 +1820,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             });
             lastMouseSelectLocation.current = undefined;
 
-            if (!args.isTouch && args.button === 0) {
+            if (!args.isTouch) {
                 handleSelect(args);
-            } else if (!args.isTouch && args.button === 1) {
-                lastMouseSelectLocation.current = args.location;
             }
         },
         [gridSelection, handleSelect]
@@ -1953,9 +1909,9 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     const isPrevented = React.useRef(false);
 
     const normalSizeColumn = React.useCallback(
-        async (col: number, force: boolean = false): Promise<void> => {
+        async (col: number): Promise<void> => {
             if (
-                (mouseDownData.current?.wasDoubleClick === true || force) &&
+                mouseDownData.current?.wasDoubleClick === true &&
                 getCellsForSelection !== undefined &&
                 onColumnResize !== undefined
             ) {
@@ -2013,7 +1969,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             const mouse = mouseState;
             setMouseState(undefined);
             setScrollDir(undefined);
-            isActivelyDraggingHeader.current = false;
 
             if (isOutside) return;
 
@@ -2036,7 +1991,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         preventDefault,
                     });
                 }
-                if (a.button === 1) return !isPrevented.current;
                 if (!isPrevented.current) {
                     const c = getMangledCellContent(args.location);
                     const r = getCellRenderer(c);
@@ -2152,7 +2106,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
             }
 
-            if (args.kind === "cell" && (args.button === 0 || args.button === 1)) {
+            if (args.kind === "cell" && args.button === 0) {
                 handleMaybeClick(args);
             }
 
@@ -2189,7 +2143,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             };
             onMouseMove?.(a);
             setScrollDir(cv => {
-                if (isActivelyDraggingHeader.current) return [args.scrollEdge[0], 0];
                 if (args.scrollEdge[0] === cv?.[0] && args.scrollEdge[1] === cv[1]) return cv;
                 return mouseState === undefined || (mouseDownData.current?.location[0] ?? 0) < rowMarkerOffset
                     ? undefined
@@ -2243,9 +2196,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                               },
                 },
             };
-            visibleRegionRef.current = newRegion;
-            setVisibleRegion(newRegion);
             setClientSize([clientWidth, clientHeight, rightElWidth]);
+            setVisibleRegion(newRegion);
             onVisibleRegionChanged?.(newRegion, newRegion.tx, newRegion.ty, newRegion.extras);
         },
         [
@@ -2298,7 +2250,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
     const onItemHoveredImpl = React.useCallback(
         (args: GridMouseEventArgs) => {
-            if (mouseDownData?.current?.button !== undefined && mouseDownData.current.button >= 1) return;
             if (
                 mouseState !== undefined &&
                 mouseDownData.current?.location[0] === 0 &&
@@ -2714,11 +2665,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             if (!cellValue.allowOverlay && cellValue.kind !== GridCellKind.Boolean) continue;
                             let newVal: InnerGridCell | undefined = undefined;
                             if (cellValue.kind === GridCellKind.Custom) {
-                                const toDelete = getCellRenderer(cellValue);
-                                const editor = toDelete?.provideEditor?.(cellValue);
-                                if (toDelete?.onDelete !== undefined) {
-                                    newVal = toDelete.onDelete(cellValue);
-                                } else if (isObjectEditorCallbackResult(editor)) {
+                                const editor = provideEditor?.(cellValue);
+                                if (isObjectEditorCallbackResult(editor)) {
                                     newVal = editor?.deletedValue?.(cellValue);
                                 }
                             } else if (
@@ -2992,6 +2940,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             overlayID,
             focus,
             mangledOnCellsEdited,
+            provideEditor,
             getCellRenderer,
             onDelete,
             mangledCols.length,
@@ -3066,7 +3015,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     if (r === undefined) return undefined;
                     if (r.kind === GridCellKind.Custom) {
                         assert(inner.kind === GridCellKind.Custom);
-                        const newVal = (r as unknown as CustomRenderer<CustomCell<any>>).onPaste?.(toPaste, inner.data);
+                        const newVal = r.onPaste?.(toPaste, inner);
                         if (newVal === undefined) return undefined;
                         return {
                             location: target,
@@ -3267,7 +3216,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             {
                                 x: rowMarkerOffset,
                                 y: rowIndex,
-                                width: columnsIn.length,
+                                width: columnsIn.length - rowMarkerOffset,
                                 height: 1,
                             },
                             abortControllerRef.current.signal
@@ -3319,13 +3268,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
 
     const onSearchResultsChanged = React.useCallback(
         (results: readonly Item[], navIndex: number) => {
-            if (onSearchResultsChangedIn !== undefined) {
-                if (rowMarkerOffset !== 0) {
-                    results = results.map(item => [item[0] - rowMarkerOffset, item[1]]);
-                }
-                onSearchResultsChangedIn(results, navIndex);
-                return;
-            }
             if (results.length === 0 || navIndex === -1) return;
 
             const [col, row] = results[navIndex];
@@ -3335,7 +3277,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
             lastSent.current = [col, row];
             updateSelectedCell(col, row, false, false);
         },
-        [onSearchResultsChangedIn, rowMarkerOffset, updateSelectedCell]
+        [updateSelectedCell]
     );
 
     // this effects purpose in life is to scroll the newly selected cell into view when and ONLY when that cell
@@ -3356,15 +3298,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
         }
         hasJustScrolled.current = false; //only allow skipping a single scroll
     }, [outCol, outRow]);
-
-    const selectionOutOfBounds =
-        gridSelection.current !== undefined &&
-        (gridSelection.current.cell[0] >= mangledCols.length || gridSelection.current.cell[1] >= mangledRows);
-    React.useLayoutEffect(() => {
-        if (selectionOutOfBounds) {
-            setGridSelection(emptyGridSelection, false);
-        }
-    }, [selectionOutOfBounds, setGridSelection]);
 
     const disabledRows = React.useMemo(() => {
         if (showTrailingBlankRow === true && trailingRowOptions?.tint === true) {
@@ -3405,7 +3338,7 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
     React.useImperativeHandle(
         forwardedRef,
         () => ({
-            appendRow: (col: number, openOverlay?: boolean) => appendRow(col + rowMarkerOffset, openOverlay),
+            appendRow: (col: number) => appendRow(col + rowMarkerOffset),
             updateCells: damageList => {
                 if (rowMarkerOffset !== 0) {
                     damageList = damageList.map(x => ({ cell: [x.cell[0] + rowMarkerOffset, x.cell[1]] }));
@@ -3431,7 +3364,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             shiftKey: false,
                             altKey: false,
                             rawEvent: undefined,
-                            location: undefined,
                         });
                         break;
                     case "fill-right":
@@ -3447,7 +3379,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             shiftKey: false,
                             altKey: false,
                             rawEvent: undefined,
-                            location: undefined,
                         });
                         break;
                     case "fill-down":
@@ -3463,7 +3394,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                             shiftKey: false,
                             altKey: false,
                             rawEvent: undefined,
-                            location: undefined,
                         });
                         break;
                     case "copy":
@@ -3475,13 +3405,8 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                 }
             },
             scrollTo,
-            remeasureColumns: cols => {
-                for (const col of cols) {
-                    void normalSizeColumn(col + rowMarkerOffset, true);
-                }
-            },
         }),
-        [appendRow, normalSizeColumn, onCopy, onKeyDown, onPasteInternal, rowMarkerOffset, scrollTo]
+        [appendRow, onCopy, onKeyDown, onPasteInternal, rowMarkerOffset, scrollTo]
     );
 
     const [selCol, selRow] = currentCell ?? [];
@@ -3656,9 +3581,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                     onVisibleRegionChanged={onVisibleRegionChangedImpl}
                     clientSize={[clientSize[0], clientSize[1]]}
                     rowHeight={rowHeight}
-                    searchResults={searchResults}
-                    searchValue={searchValue}
-                    onSearchValueChange={onSearchValueChange}
                     rows={mangledRows}
                     scrollRef={scrollRef}
                     selection={gridSelection}
@@ -3681,7 +3603,6 @@ const DataEditorImpl: React.ForwardRefRenderFunction<DataEditorRef, DataEditorPr
                         imageEditorOverride={imageEditorOverride}
                         onFinishEditing={onFinishEditing}
                         markdownDivCreateNode={markdownDivCreateNode}
-                        isOutsideClick={isOutsideClick}
                     />
                 )}
             </DataEditorContainer>

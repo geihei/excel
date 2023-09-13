@@ -103,7 +103,6 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
         onMouseUp,
         onItemHovered,
         onDragStart,
-        canvasRef,
     } = p;
 
     const canResize = (onColumnResize ?? onColumnResizeEnd ?? onColumnResizeStart) !== undefined;
@@ -139,18 +138,14 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                         setResizeCol(columns.length - 1);
                     }
                 } else if (args.kind === "header" && col >= lockColumns) {
-                    const canvas = canvasRef?.current;
-                    if (args.isEdge && canResize && canvas) {
+                    if (args.isEdge && canResize) {
                         setResizeColStartX(args.bounds.x);
                         setResizeCol(col);
-                        const rect = canvas.getBoundingClientRect();
-                        const scale = rect.width / canvas.offsetWidth;
-                        const width = args.bounds.width / scale;
                         onColumnResizeStart?.(
                             columns[col],
-                            width,
+                            args.bounds.width,
                             col,
-                            width + (columns[col].growOffset ?? 0)
+                            args.bounds.width + (columns[col].growOffset ?? 0)
                         );
                     } else if (args.kind === "header" && canDragCol) {
                         setDragStartX(args.bounds.x);
@@ -169,7 +164,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             }
             onMouseDown?.(args);
         },
-        [onMouseDown, canResize, lockColumns, onRowMoved, gridRef, columns, canDragCol, onColumnResizeStart, canvasRef]
+        [onMouseDown, canResize, lockColumns, onRowMoved, gridRef, columns, canDragCol, onColumnResizeStart]
     );
 
     const onHeaderMenuClickMangled = React.useCallback(
@@ -223,13 +218,11 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                         maxColumnWidth
                     );
                     onColumnResizeEnd?.(columns[resizeCol], ns, resizeCol, ns + (columns[resizeCol].growOffset ?? 0));
-                    if (selectedColumns.hasIndex(resizeCol)) {
-                        for (const c of selectedColumns) {
-                            if (c === resizeCol) continue;
-                            const col = columns[c];
-                            const s = offsetColumnSize(col, lastResizeWidthRef.current, minColumnWidth, maxColumnWidth);
-                            onColumnResizeEnd?.(col, s, c, s + (col.growOffset ?? 0));
-                        }
+                    for (const c of selectedColumns) {
+                        if (c === resizeCol) continue;
+                        const col = columns[c];
+                        const s = offsetColumnSize(col, lastResizeWidthRef.current, minColumnWidth, maxColumnWidth);
+                        onColumnResizeEnd?.(col, s, c, s + (col.growOffset ?? 0));
                     }
                 }
 
@@ -274,7 +267,6 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
 
     const onMouseMove = React.useCallback(
         (event: MouseEvent) => {
-            const canvas = canvasRef?.current;
             if (dragCol !== undefined && dragStartX !== undefined) {
                 const diff = Math.abs(event.clientX - dragStartX);
                 if (diff > 20) {
@@ -285,11 +277,9 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                 if (diff > 20) {
                     setDragRowActive(true);
                 }
-            } else if (resizeCol !== undefined && resizeColStartX !== undefined && canvas) {
-                const rect = canvas.getBoundingClientRect();
-                const scale = rect.width / canvas.offsetWidth;
-                const newWidth = (event.clientX - resizeColStartX) / scale;
+            } else if (resizeCol !== undefined && resizeColStartX !== undefined) {
                 const column = columns[resizeCol];
+                const newWidth = event.clientX - resizeColStartX;
                 const ns = offsetColumnSize(column, newWidth, minColumnWidth, maxColumnWidth);
                 onColumnResize?.(column, ns, resizeCol, ns + (column.growOffset ?? 0));
                 lastResizeWidthRef.current = newWidth;
@@ -316,13 +306,12 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
             maxColumnWidth,
             onColumnResize,
             selectedColumns,
-            canvasRef,
         ]
     );
 
     const getMangledCellContent = React.useCallback<typeof getCellContent>(
-        (cell, forceStrict) => {
-            if (dragRow === undefined || dropRow === undefined) return getCellContent(cell, forceStrict);
+        cell => {
+            if (dragRow === undefined || dropRow === undefined) return getCellContent(cell);
 
             // eslint-disable-next-line prefer-const
             let [col, row] = cell;
@@ -333,7 +322,7 @@ const DataGridDnd: React.FunctionComponent<DataGridDndProps> = p => {
                 if (row >= dragRow) row += 1;
             }
 
-            return getCellContent([col, row], forceStrict);
+            return getCellContent([col, row]);
         },
         [dragRow, dropRow, getCellContent]
     );

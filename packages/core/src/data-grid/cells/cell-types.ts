@@ -22,7 +22,6 @@ export interface BaseDrawArgs {
     imageLoader: ImageWindowLoader;
     spriteManager: SpriteManager;
     hyperWrapping: boolean;
-    cell: InnerGridCell;
     requestAnimationFrame: () => void;
 }
 

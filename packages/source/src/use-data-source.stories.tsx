@@ -1,18 +1,9 @@
 import { styled } from "@linaria/react";
 import * as React from "react";
 import { useResizeDetector } from "react-resize-detector";
-import {
-    DataEditor,
-    DataEditorProps,
-    DataEditorRef,
-    GridCellKind,
-    GridColumn,
-    Theme,
-} from "@glideapps/glide-data-grid";
-import { faker } from "@faker-js/faker";
-import { useCollapsingGroups, useColumnSort, useMoveableColumns } from "..";
-import { useUndoRedo } from "../use-undo-redo";
-import { useMockDataGenerator } from "./utils";
+import { DataEditor, DataEditorProps, GridCellKind, GridColumn, Theme } from "@glideapps/glide-data-grid";
+import faker from "faker";
+import { useCollapsingGroups, useColumnSort, useMoveableColumns } from ".";
 
 faker.seed(1337);
 
@@ -121,25 +112,6 @@ const Description = styled.p`
     font-size: 18px;
     flex-shrink: 0;
     margin: 0 0 20px 0;
-`;
-
-export const MoreInfo = styled.p`
-    font-size: 14px;
-    flex-shrink: 0;
-    margin: 0 0 20px 0;
-
-    button {
-        background-color: #f4f4f4;
-        color: #2b2b2b;
-        padding: 2px 6px;
-        font-family: monospace;
-        font-size: 14px;
-        border-radius: 4px;
-        box-shadow: 0px 1px 2px #00000040;
-        margin: 0 0.1em;
-        border: none;
-        cursor: pointer;
-    }
 `;
 
 const defaultProps: Partial<DataEditorProps> = {
@@ -295,57 +267,6 @@ export const UseDataSource: React.VFC = () => {
     );
 };
 (UseDataSource as any).parameters = {
-    options: {
-        showPanel: false,
-    },
-};
-
-export const UndoRedo: React.VFC = () => {
-    const { cols: columns, getCellContent, setCellValue } = useMockDataGenerator(6);
-
-    const gridRef = React.useRef<DataEditorRef>(null);
-
-    const { gridSelection, onCellEdited, onGridSelectionChange, undo, canRedo, canUndo, redo } = useUndoRedo(
-        gridRef,
-        getCellContent,
-        setCellValue
-    );
-
-    return (
-        <BeautifulWrapper
-            title="Undo / Redo Support"
-            description={
-                <Description>
-                    A simple undo/redo implementation
-                    <MoreInfo>
-                        Use keyboard shortcuts CMD+Z and CMD+SHIFT+Z / CTRL+Z and CTRL+Y. Or click these buttons:
-                        <button onClick={undo} disabled={!canUndo} style={{ opacity: canUndo ? 1 : 0.4 }}>
-                            Undo
-                        </button>
-                        <button onClick={redo} disabled={!canRedo} style={{ opacity: canRedo ? 1 : 0.4 }}>
-                            Redo
-                        </button>
-                    </MoreInfo>
-                    <MoreInfo>
-                        It works by taking a snapshot of the content of a cell before it is edited and replaying any
-                        edits back.
-                    </MoreInfo>
-                </Description>
-            }>
-            <DataEditor
-                {...defaultProps}
-                ref={gridRef}
-                onCellEdited={onCellEdited}
-                getCellContent={getCellContent}
-                gridSelection={gridSelection ?? undefined}
-                onGridSelectionChange={onGridSelectionChange}
-                columns={columns}
-                rows={1000}
-            />
-        </BeautifulWrapper>
-    );
-};
-(UndoRedo as any).parameters = {
     options: {
         showPanel: false,
     },

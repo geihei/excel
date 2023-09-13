@@ -11,7 +11,7 @@ import {
     isSizedGridColumn,
     Item,
 } from "../src";
-import type { CustomCell, GridKeyEventArgs, SizedGridColumn } from "../src/data-grid/data-grid-types";
+import type { SizedGridColumn } from "../src/data-grid/data-grid-types";
 import type { DataEditorRef } from "../src/data-editor/data-editor";
 import { assert } from "../src/common/support";
 
@@ -24,26 +24,6 @@ jest.mock("../src/common/resize-detector", () => {
 const BOOLEAN_DATA_LOOKUP: (boolean | null | undefined)[] = [true, false, undefined, null];
 function getMockBooleanData(row: number): boolean | null | undefined {
     return BOOLEAN_DATA_LOOKUP[row % BOOLEAN_DATA_LOOKUP.length];
-}
-
-function sendClick(el: Element | Node | Document | Window, options?: any): void {
-    fireEvent.mouseDown(el, options);
-    fireEvent.mouseUp(el, options);
-    fireEvent.click(el, options);
-}
-
-function sendTouchClick(el: Element | Node | Document | Window, options?: any): void {
-    fireEvent.touchStart(el, options);
-    fireEvent.touchEnd(el, {
-        ...options,
-        changedTouches: options.touches,
-    });
-    fireEvent.click(el, {
-        clientX: options?.touches?.[0]?.clientX,
-        clientY: options?.touches?.[0]?.clientY,
-        pointerType: "touch",
-        ...options,
-    });
 }
 
 const makeCell = (cell: Item): GridCell => {
@@ -252,13 +232,6 @@ a new line char ""more quotes"" plus a tab  ."	https://google.com`)
         y: 0,
         toJSON: () => "",
     });
-    Object.defineProperties(HTMLElement.prototype, {
-        offsetWidth: {
-            get() {
-                return 1000;
-            },
-        },
-    });
     Image.prototype.decode = jest.fn();
 });
 
@@ -382,35 +355,6 @@ describe("data-editor", () => {
         );
     });
 
-    test("emits contextmenu for row marker", async () => {
-        const spy = jest.fn();
-        const spySelection = jest.fn();
-
-        jest.useFakeTimers();
-        render(
-            <DataEditor
-                {...basicProps}
-                rowMarkers="both"
-                onCellContextMenu={spy}
-                onGridSelectionChange={spySelection}
-            />,
-            {
-                wrapper: Context,
-            }
-        );
-        const scroller = prep();
-
-        assert(scroller !== null);
-
-        screen.getByTestId("data-grid-canvas");
-        fireEvent.contextMenu(scroller, {
-            clientX: 10, // Row marker
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        expect(spy).toHaveBeenCalledWith([-1, 1], expect.anything());
-    });
-
     test("emits contextmenu for cell but does not change selection if already selected - rows", async () => {
         const spy = jest.fn();
         const spySelection = jest.fn();
@@ -474,37 +418,6 @@ describe("data-editor", () => {
         });
 
         expect(spy).toHaveBeenCalledWith([1, 1], expect.anything());
-        expect(spySelection).not.toHaveBeenCalled();
-    });
-
-    test("middle click does not change selection", async () => {
-        const spySelection = jest.fn();
-
-        jest.useFakeTimers();
-        render(
-            <DataEditor
-                {...basicProps}
-                gridSelection={{
-                    columns: CompactSelection.empty(),
-                    rows: CompactSelection.empty(),
-                }}
-                onGridSelectionChange={spySelection}
-            />,
-            {
-                wrapper: Context,
-            }
-        );
-        prep();
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-
-        screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-            button: 1,
-        });
-
         expect(spySelection).not.toHaveBeenCalled();
     });
 
@@ -628,55 +541,18 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
         expect(spy).toHaveBeenCalled();
         expect(spy).toHaveBeenCalledWith([1, 1], expect.anything());
-    });
-
-    test("Emits cell clicked with middle button", async () => {
-        const spy = jest.fn();
-
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} onCellClicked={spy} />, {
-            wrapper: Context,
-        });
-        prep();
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-
-        sendClick(canvas, {
-            button: 1,
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        expect(spy).toHaveBeenCalled();
-        expect(spy).toHaveBeenCalledWith([1, 1], expect.anything());
-    });
-
-    test("Does not emits cell clicked with back button", async () => {
-        const spy = jest.fn();
-
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} onCellClicked={spy} />, {
-            wrapper: Context,
-        });
-        prep();
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-
-        sendClick(canvas, {
-            button: 4,
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        expect(spy).not.toHaveBeenCalled();
     });
 
     test("Emits cell click with touch", async () => {
@@ -689,8 +565,17 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendTouchClick(canvas, {
+        fireEvent.touchStart(canvas, {
             touches: [
+                {
+                    clientX: 300, // Col B
+                    clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+                },
+            ],
+        });
+
+        fireEvent.touchEnd(canvas, {
+            changedTouches: [
                 {
                     clientX: 300, // Col B
                     clientY: 36 + 32 + 16, // Row 1 (0 indexed)
@@ -712,43 +597,28 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
         expect(spy).toHaveBeenCalled();
         expect(spy).toHaveBeenCalledWith([1, 1]);
-    });
-
-    test("Does not emit activated event on double click with different buttons", async () => {
-        const spy = jest.fn();
-
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} onCellActivated={spy} />, {
-            wrapper: Context,
-        });
-        prep();
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            button: 0,
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        sendClick(canvas, {
-            button: 1,
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        expect(spy).not.toHaveBeenCalled();
     });
 
     test("Emits activated event on Enter key", async () => {
@@ -761,7 +631,12 @@ describe("data-editor", () => {
         prep(false);
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -786,7 +661,12 @@ describe("data-editor", () => {
         prep(false);
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -799,42 +679,6 @@ describe("data-editor", () => {
 
         expect(spy).toHaveBeenCalled();
         expect(spy).toHaveBeenCalledWith([1, 1]);
-    });
-
-    test("keyDown and keyUp events include the cell location", async () => {
-        let keyDownEvent: GridKeyEventArgs | undefined;
-        let keyUpEvent: GridKeyEventArgs | undefined;
-        const keyDown = (e: GridKeyEventArgs) => {
-            keyDownEvent = e;
-        };
-        const keyUp = (e: GridKeyEventArgs) => {
-            keyUpEvent = e;
-        };
-
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} onKeyDown={keyDown} onKeyUp={keyUp} />, {
-            wrapper: Context,
-        });
-        prep(false);
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        fireEvent.keyDown(canvas, {
-            key: " ",
-        });
-
-        fireEvent.keyUp(canvas, {
-            key: " ",
-        });
-
-        jest.runAllTimers();
-
-        expect(keyDownEvent?.location).toEqual([1, 1]);
-        expect(keyUpEvent?.location).toEqual([1, 1]);
     });
 
     test("Doesn't emit cell click if mouseDown happened in a different cell", async () => {
@@ -893,7 +737,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 64 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 64 + 16, // Row 1 (0 indexed)
         });
@@ -910,7 +759,7 @@ describe("data-editor", () => {
         });
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -945,7 +794,7 @@ describe("data-editor", () => {
         });
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -979,7 +828,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 16, // Header
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 16, // Header
         });
@@ -998,8 +852,17 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendTouchClick(canvas, {
+        fireEvent.touchStart(canvas, {
             touches: [
+                {
+                    clientX: 300, // Col B
+                    clientY: 16, // Header
+                },
+            ],
+        });
+
+        fireEvent.touchEnd(canvas, {
+            changedTouches: [
                 {
                     clientX: 300, // Col B
                     clientY: 16, // Header
@@ -1021,7 +884,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10, // Col B
+            clientY: 16, // Header
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10, // Col B
             clientY: 16, // Header
         });
@@ -1050,7 +918,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 16, // GroupHeader
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 16, // GroupHeader
         });
@@ -1063,7 +936,13 @@ describe("data-editor", () => {
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            ctrlKey: true,
+            clientX: 300, // Col B
+            clientY: 16, // GroupHeader
+        });
+
+        fireEvent.mouseUp(canvas, {
             ctrlKey: true,
             clientX: 300, // Col B
             clientY: 16, // GroupHeader
@@ -1077,7 +956,13 @@ describe("data-editor", () => {
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            ctrlKey: true,
+            clientX: 300, // Col B
+            clientY: 16, // GroupHeader
+        });
+
+        fireEvent.mouseUp(canvas, {
             ctrlKey: true,
             clientX: 300, // Col B
             clientY: 16, // GroupHeader
@@ -1114,7 +999,12 @@ describe("data-editor", () => {
 
         await new Promise(r => window.setTimeout(r, 100));
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 16, // Group Header
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 16, // Group Header
         });
@@ -1160,7 +1050,12 @@ describe("data-editor", () => {
 
         await new Promise(r => window.setTimeout(r, 100));
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 16, // Header
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 16, // Header
         });
@@ -1187,8 +1082,17 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendTouchClick(canvas, {
+        fireEvent.touchStart(canvas, {
             touches: [
+                {
+                    clientX: 300, // Col B
+                    clientY: 16, // Group header
+                },
+            ],
+        });
+
+        fireEvent.touchEnd(canvas, {
+            changedTouches: [
                 {
                     clientX: 300, // Col B
                     clientY: 16, // Group header
@@ -1328,58 +1232,6 @@ describe("data-editor", () => {
         expect(spy).toHaveBeenCalledWith([2, 2], expect.anything());
     });
 
-    test("Delete custom", async () => {
-        const spy = jest.fn();
-
-        jest.useFakeTimers();
-        render(
-            <DataEditor
-                {...basicProps}
-                getCellContent={() => ({
-                    kind: GridCellKind.Custom,
-                    allowOverlay: true,
-                    copyData: "fake",
-                    data: "fake",
-                })}
-                customRenderers={[
-                    {
-                        draw: () => undefined,
-                        isMatch: (c): c is CustomCell => c.kind === GridCellKind.Custom,
-                        kind: GridCellKind.Custom,
-                        onDelete: spy,
-                    },
-                ]}
-                onDelete={sel => sel}
-                gridSelection={{
-                    columns: CompactSelection.empty(),
-                    rows: CompactSelection.empty(),
-                    current: {
-                        cell: [2, 2],
-                        range: {
-                            x: 2,
-                            y: 2,
-                            height: 1,
-                            width: 1,
-                        },
-                        rangeStack: [],
-                    },
-                }}
-                rowMarkers="both"
-            />,
-            {
-                wrapper: Context,
-            }
-        );
-        prep();
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        fireEvent.keyDown(canvas, {
-            key: "Delete",
-        });
-
-        expect(spy).toHaveBeenCalledWith({ allowOverlay: true, copyData: "fake", data: "fake", kind: "custom" });
-    });
-
     test("Delete row", async () => {
         const spy = jest.fn();
 
@@ -1458,12 +1310,22 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1491,12 +1353,22 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 980, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
+            clientX: 980, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseDown(canvas, {
+            clientX: 980, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 980, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1523,7 +1395,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1562,7 +1439,12 @@ describe("data-editor", () => {
         prep(false);
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1600,106 +1482,6 @@ describe("data-editor", () => {
         expect(overlay).not.toBeInTheDocument();
     });
 
-    test("Send edit with click off", async () => {
-        const spy = jest.fn();
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} onCellEdited={spy} />, {
-            wrapper: Context,
-        });
-        prep(false);
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        fireEvent.keyDown(canvas, {
-            keyCode: 74,
-            key: "j",
-        });
-
-        fireEvent.keyUp(canvas, {
-            keyCode: 74,
-            key: "j",
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        const overlay = screen.getByDisplayValue("j");
-        expect(overlay).toBeInTheDocument();
-
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 * 5 + 16, // Row 1 (0 indexed)
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        expect(spy).toBeCalledWith([1, 1], expect.objectContaining({ data: "j" }));
-        expect(overlay).not.toBeInTheDocument();
-    });
-
-    test("Send edit with touch off", async () => {
-        const spy = jest.fn();
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} onCellEdited={spy} />, {
-            wrapper: Context,
-        });
-        prep(false);
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        fireEvent.keyDown(canvas, {
-            keyCode: 74,
-            key: "j",
-        });
-
-        fireEvent.keyUp(canvas, {
-            keyCode: 74,
-            key: "j",
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        const overlay = screen.getByDisplayValue("j");
-        expect(overlay).toBeInTheDocument();
-
-        sendTouchClick(canvas, {
-            touches: [
-                {
-                    clientX: 300, // Col B
-                    clientY: 36 + 32 * 5 + 16, // Row 1 (0 indexed)}
-                },
-            ],
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        expect(spy).toBeCalledWith([1, 1], expect.objectContaining({ data: "j" }));
-        expect(overlay).not.toBeInTheDocument();
-    });
-
     test("Directly toggle booleans", async () => {
         const spy = jest.fn();
         jest.useFakeTimers();
@@ -1723,28 +1505,32 @@ describe("data-editor", () => {
         // [7, 0] is a checked boolean
         const [checkedX, checkedY] = getCellCenterPositionForDefaultGrid([7, 0]);
 
-        sendClick(canvas, { clientX: checkedX, clientY: checkedY });
+        fireEvent.mouseDown(canvas, { clientX: checkedX, clientY: checkedY });
+        fireEvent.mouseUp(canvas, { clientX: checkedX, clientY: checkedY });
 
         expect(spy).toBeCalledWith([7, 0], expect.objectContaining({ data: false }));
 
         // [7, 1] is an unchecked boolean
         const [uncheckedX, uncheckedY] = getCellCenterPositionForDefaultGrid([7, 1]);
 
-        sendClick(canvas, { clientX: uncheckedX, clientY: uncheckedY });
+        fireEvent.mouseDown(canvas, { clientX: uncheckedX, clientY: uncheckedY });
+        fireEvent.mouseUp(canvas, { clientX: uncheckedX, clientY: uncheckedY });
 
         expect(spy).toBeCalledWith([7, 1], expect.objectContaining({ data: true }));
 
         // [7, 2] is an indeterminate boolean
         const [indeterminateX, indeterminateY] = getCellCenterPositionForDefaultGrid([7, 2]);
 
-        sendClick(canvas, { clientX: indeterminateX, clientY: indeterminateY });
+        fireEvent.mouseDown(canvas, { clientX: indeterminateX, clientY: indeterminateY });
+        fireEvent.mouseUp(canvas, { clientX: indeterminateX, clientY: indeterminateY });
 
         expect(spy).toBeCalledWith([7, 2], expect.objectContaining({ data: true }));
 
         // [7, 3] is an empty boolean
         const [emptyX, emptyY] = getCellCenterPositionForDefaultGrid([7, 3]);
 
-        sendClick(canvas, { clientX: emptyX, clientY: emptyY });
+        fireEvent.mouseDown(canvas, { clientX: emptyX, clientY: emptyY });
+        fireEvent.mouseUp(canvas, { clientX: emptyX, clientY: emptyY });
 
         expect(spy).toBeCalledWith([7, 3], expect.objectContaining({ data: true }));
     });
@@ -1772,7 +1558,8 @@ describe("data-editor", () => {
         // [7, 0] is a checked boolean readonly
         const [checkedX, checkedY] = getCellCenterPositionForDefaultGrid([7, 5]);
 
-        sendClick(canvas, { clientX: checkedX, clientY: checkedY });
+        fireEvent.mouseDown(canvas, { clientX: checkedX, clientY: checkedY });
+        fireEvent.mouseUp(canvas, { clientX: checkedX, clientY: checkedY });
 
         expect(spy).not.toBeCalled();
     });
@@ -1799,7 +1586,8 @@ describe("data-editor", () => {
         // [7, 0] is a checked boolean readonly
         const [checkedX, checkedY] = getCellCenterPositionForDefaultGrid([7, 5]);
 
-        sendClick(canvas, { clientX: checkedX + 20, clientY: checkedY });
+        fireEvent.mouseDown(canvas, { clientX: checkedX + 20, clientY: checkedY });
+        fireEvent.mouseUp(canvas, { clientX: checkedX + 20, clientY: checkedY });
 
         act(() => {
             jest.runAllTimers();
@@ -1821,7 +1609,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1843,7 +1636,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1870,7 +1668,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1892,7 +1695,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1919,7 +1727,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1949,7 +1762,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -1971,7 +1789,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
@@ -2055,7 +1878,12 @@ describe("data-editor", () => {
 
         const canvas = screen.getByTestId("data-grid-canvas");
         jest.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
@@ -2084,7 +1912,7 @@ describe("data-editor", () => {
         act(() => {
             jest.runAllTimers();
         });
-        expect(navigator.clipboard.writeText).toBeCalledWith('"1, 2"\t"2, 2"');
+        expect(navigator.clipboard.writeText).toBeCalledWith("1, 2\t2, 2");
 
         spy.mockClear();
         fireEvent.keyDown(canvas, {
@@ -2117,61 +1945,6 @@ describe("data-editor", () => {
         );
     });
 
-    test("Paste custom cell does not crash", async () => {
-        jest.useFakeTimers();
-
-        // eslint-disable-next-line unicorn/consistent-function-scoping
-        const alwaysCustomCell = (_cell: Item): GridCell => {
-            return {
-                kind: GridCellKind.Custom,
-                allowOverlay: true,
-                data: "custom-cell-data",
-                copyData: "custom-cell-copy-data",
-            };
-        };
-
-        const spy = jest.fn();
-
-        render(
-            <EventedDataEditor
-                {...basicProps}
-                getCellContent={alwaysCustomCell}
-                customRenderers={[
-                    {
-                        kind: GridCellKind.Custom,
-                        draw: () => true,
-                        onPaste: spy,
-                        isMatch: (_cell: CustomCell): _cell is CustomCell => true,
-                    },
-                ]}
-            />,
-            {
-                wrapper: Context,
-            }
-        );
-        prep(false);
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        jest.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
-        });
-
-        act(() => {
-            jest.runAllTimers();
-        });
-
-        fireEvent.paste(window);
-        act(() => {
-            jest.runAllTimers();
-        });
-        jest.useRealTimers();
-        await new Promise(r => window.setTimeout(r, 10));
-
-        expect(spy).toBeCalledWith(expect.anything(), "custom-cell-data");
-    });
-
     test("onCellsEdited blocks onCellEdited", async () => {
         const spy = jest.fn();
         jest.useFakeTimers();
@@ -2182,7 +1955,12 @@ describe("data-editor", () => {
 
         const canvas = screen.getByTestId("data-grid-canvas");
         jest.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
@@ -2219,7 +1997,12 @@ describe("data-editor", () => {
 
         const canvas = screen.getByTestId("data-grid-canvas");
         jest.spyOn(document, "activeElement", "get").mockImplementation(() => canvas);
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
@@ -2244,7 +2027,7 @@ describe("data-editor", () => {
         act(() => {
             jest.runAllTimers();
         });
-        expect(navigator.clipboard.writeText).toBeCalledWith('"1, 2"\t"2, 2"');
+        expect(navigator.clipboard.writeText).toBeCalledWith("1, 2\t2, 2");
 
         spy.mockClear();
         fireEvent.keyDown(canvas, {
@@ -2282,10 +2065,9 @@ describe("data-editor", () => {
         render(
             <EventedDataEditor
                 {...basicProps}
-                rowMarkers="both"
                 gridSelection={{
                     current: undefined,
-                    rows: CompactSelection.fromSingleSelection([3, 4]),
+                    rows: CompactSelection.fromSingleSelection([3, 6]),
                     columns: CompactSelection.empty(),
                 }}
             />,
@@ -2300,9 +2082,7 @@ describe("data-editor", () => {
 
         fireEvent.copy(window);
         await new Promise(resolve => setTimeout(resolve, 10));
-        expect(navigator.clipboard.writeText).toBeCalledWith(
-            '"Data: 0, 3"\t"1, 3"\t"2, 3"\t3\tFoobar\t************\tFoobar\t\t"שלום 8, 3"\t"# Header: 9, 3"\thttps://example.com/10/3'
-        );
+        expect(navigator.clipboard.writeText).toBeCalled();
     });
 
     test("Copy cols", async () => {
@@ -2471,7 +2251,12 @@ describe("data-editor", () => {
 
         jest.useFakeTimers();
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 990, // Trailing row
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 990, // Trailing row
         });
@@ -2495,7 +2280,12 @@ describe("data-editor", () => {
 
         jest.useFakeTimers();
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10, // Row marker
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
@@ -2515,14 +2305,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10, // Row marker
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 10, // Row marker
             clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
@@ -2580,14 +2381,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10, // Row marker
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 10, // Row marker
             clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
@@ -2608,14 +2420,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10, // Row marker
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            ctrlKey: true,
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             ctrlKey: true,
             clientX: 10, // Row marker
             clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
@@ -2628,7 +2451,13 @@ describe("data-editor", () => {
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            ctrlKey: true,
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             ctrlKey: true,
             clientX: 10, // Row marker
             clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
@@ -2652,14 +2481,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10, // Row marker
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            ctrlKey: true,
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             ctrlKey: true,
             clientX: 10, // Row marker
             clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
@@ -2672,7 +2512,13 @@ describe("data-editor", () => {
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            ctrlKey: true,
+            clientX: 10, // Row marker
+            clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             ctrlKey: true,
             clientX: 10, // Row marker
             clientY: 36 + 32 * 5 + 16, // Row 2 (0 indexed)
@@ -2693,14 +2539,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 400, // Col C
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 400, // Col C
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2742,12 +2599,23 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 400, // Col C
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 400, // Col C
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2780,12 +2648,23 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 400, // Col C
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 400, // Col C
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2809,14 +2688,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 400, // Col C
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 400, // Col C
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2843,14 +2733,25 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 400, // Col C
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 400, // Col C
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2875,12 +2776,23 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 100, // Col A
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseUp(canvas, {
+            clientX: 100, // Col A
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 200, // Col B
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 200, // Col B
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2888,7 +2800,13 @@ describe("data-editor", () => {
 
         spy.mockClear();
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            shiftKey: true,
+            clientX: 700, // OOB
+            clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             shiftKey: true,
             clientX: 700, // OOB
             clientY: 36 + 32 * 6 + 16, // Row 6 (0 indexed)
@@ -2909,7 +2827,12 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 16, // Header
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 16, // Header
         });
@@ -2960,11 +2883,6 @@ describe("data-editor", () => {
             clientY: 16, // Header
         });
 
-        fireEvent.click(canvas, {
-            clientX: 100, // Col A
-            clientY: 16, // Header
-        });
-
         expect(spy).toBeCalledWith(1, 0);
     });
 
@@ -2988,11 +2906,6 @@ describe("data-editor", () => {
         });
 
         fireEvent.mouseUp(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
-        fireEvent.click(canvas, {
             clientX: 350,
             clientY: 16,
         });
@@ -3029,25 +2942,6 @@ describe("data-editor", () => {
             clientY: 16,
         });
 
-        fireEvent.click(canvas, {
-            clientX: 310,
-            clientY: 16,
-        });
-
-        expect(spy).toBeCalledWith({ icon: "headerCode", title: "B", width: 160 }, 50, 1, 50);
-    });
-
-    test("Auto Resize Column Ref", async () => {
-        const spy = jest.fn();
-        jest.useFakeTimers();
-        const ref = React.createRef<DataEditorRef>();
-        render(<EventedDataEditor {...basicProps} ref={ref} onColumnResize={spy} />, {
-            wrapper: Context,
-        });
-        prep();
-
-        ref.current?.remeasureColumns(CompactSelection.fromSingleSelection(1));
-
         expect(spy).toBeCalledWith({ icon: "headerCode", title: "B", width: 160 }, 50, 1, 50);
     });
 
@@ -3075,56 +2969,6 @@ describe("data-editor", () => {
             clientY: 16,
         });
 
-        fireEvent.click(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
-        expect(spy).toHaveBeenCalledTimes(1);
-        expect(spy).toBeCalledWith({ icon: "headerCode", title: "B", width: 160 }, 200, 1, 200);
-    });
-
-    test("Resize column end called correct number of times", async () => {
-        const spy = jest.fn();
-        jest.useFakeTimers();
-        render(
-            <EventedDataEditor
-                {...basicProps}
-                onColumnResize={jest.fn()}
-                onColumnResizeEnd={spy}
-                gridSelection={{
-                    columns: CompactSelection.fromSingleSelection(3),
-                    rows: CompactSelection.empty(),
-                }}
-            />,
-            {
-                wrapper: Context,
-            }
-        );
-        prep();
-        const canvas = screen.getByTestId("data-grid-canvas");
-
-        fireEvent.mouseDown(canvas, {
-            clientX: 310, // Col B Right Edge
-            clientY: 16, // Header
-        });
-
-        fireEvent.mouseMove(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
-        fireEvent.mouseUp(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
-        fireEvent.click(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
-        expect(spy).toHaveBeenCalledTimes(1);
         expect(spy).toBeCalledWith({ icon: "headerCode", title: "B", width: 160 }, 200, 1, 200);
     });
 
@@ -3159,11 +3003,6 @@ describe("data-editor", () => {
         });
 
         fireEvent.mouseUp(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
-        fireEvent.click(canvas, {
             clientX: 350,
             clientY: 16,
         });
@@ -3203,11 +3042,6 @@ describe("data-editor", () => {
             clientY: 16,
         });
 
-        fireEvent.click(canvas, {
-            clientX: 350,
-            clientY: 16,
-        });
-
         expect(spy).toBeCalledWith({ icon: "headerCode", title: "B", width: 160 }, 200, 1, 200);
     });
 
@@ -3231,11 +3065,6 @@ describe("data-editor", () => {
         });
 
         fireEvent.mouseUp(canvas, {
-            clientX: 10,
-            clientY: 400,
-        });
-
-        fireEvent.click(canvas, {
             clientX: 10,
             clientY: 400,
         });
@@ -3275,41 +3104,6 @@ describe("data-editor", () => {
         });
     });
 
-    test("Select range with mouse middle click fails", async () => {
-        const spy = jest.fn();
-        jest.useFakeTimers();
-        render(<EventedDataEditor {...basicProps} onGridSelectionChange={spy} />, {
-            wrapper: Context,
-        });
-        prep();
-        const canvas = screen.getByTestId("data-grid-canvas");
-
-        sendClick(canvas, {
-            button: 0,
-            clientX: 300, // Col B
-            clientY: 36 + 32 * 2 + 16, // Row 2
-        });
-
-        fireEvent.mouseDown(canvas, {
-            button: 1,
-            clientX: 300, // Col B
-            clientY: 36 + 32 * 2 + 16, // Row 2
-        });
-
-        spy.mockClear();
-        fireEvent.mouseMove(canvas, {
-            clientX: 600, // Col B
-            clientY: 36 + 32 * 12 + 16, // Row 2
-        });
-
-        expect(spy).not.toBeCalled();
-
-        fireEvent.mouseUp(canvas, {
-            clientX: 600, // Col B
-            clientY: 36 + 32 * 12 + 16, // Row 2
-        });
-    });
-
     test("Select all", async () => {
         const spy = jest.fn();
         jest.useFakeTimers();
@@ -3327,7 +3121,12 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10,
+            clientY: 10,
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10,
             clientY: 10,
         });
@@ -3337,7 +3136,12 @@ describe("data-editor", () => {
             rows: CompactSelection.fromSingleSelection([0, 1000]),
         });
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 10,
+            clientY: 10,
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 10,
             clientY: 10,
         });
@@ -3427,7 +3231,12 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
@@ -3480,8 +3289,13 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
             clientX: 350, // Col C
+            clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
+            clientX: 300, // Col B
             clientY: 36 + 32 * 2 + 16, // Row 2 (0 indexed)
         });
 
@@ -3698,7 +3512,12 @@ describe("data-editor", () => {
         prep(false);
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 965,
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 965,
         });
@@ -3720,7 +3539,12 @@ describe("data-editor", () => {
         prep(false);
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 965,
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 965,
         });
@@ -3751,7 +3575,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -3902,7 +3731,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -3938,7 +3772,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -3974,7 +3813,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -4010,7 +3854,12 @@ describe("data-editor", () => {
         prep();
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -4112,37 +3961,6 @@ describe("data-editor", () => {
         expect(spy).not.toHaveBeenCalled();
     });
 
-    test("Dragging header disables vertical autoscroll", async () => {
-        const spy = Element.prototype.scrollBy as jest.Mock;
-        spy.mockClear();
-
-        jest.useFakeTimers();
-        render(<DataEditor {...basicProps} />, {
-            wrapper: Context,
-        });
-        prep();
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        fireEvent.mouseDown(canvas, {
-            clientX: 300, // Col B
-            clientY: 16, // Header
-        });
-
-        fireEvent.mouseMove(canvas, {
-            clientX: 300, // Col B
-            clientY: 0,
-        });
-
-        await new Promise(r => window.setTimeout(r, 100));
-
-        fireEvent.mouseUp(canvas, {
-            clientX: 300, // Col B
-            clientY: 0,
-        });
-
-        expect(spy).not.toHaveBeenCalled();
-    });
-
     test("Use fill handle", async () => {
         const spy = jest.fn();
         jest.useFakeTimers();
@@ -4152,7 +3970,12 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 290, // Col A
+            clientY: 36 + 30, // Row 2
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 290, // Col A
             clientY: 36 + 30, // Row 2
         });
@@ -4172,11 +3995,6 @@ describe("data-editor", () => {
             clientY: 36 + 32 * 2 + 16, // Row 2
         });
 
-        fireEvent.click(canvas, {
-            clientX: 308, // Col A
-            clientY: 36 + 32 * 2 + 16, // Row 2
-        });
-
         expect(spy).toBeCalledTimes(2);
     });
 
@@ -4189,7 +4007,12 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 290,
+            clientY: 36 + 30,
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 290,
             clientY: 36 + 30,
         });
@@ -4205,11 +4028,6 @@ describe("data-editor", () => {
         });
 
         fireEvent.mouseUp(canvas, {
-            clientX: 308,
-            clientY: 36 + 32 * 5 + 16,
-        });
-
-        fireEvent.click(canvas, {
             clientX: 308,
             clientY: 36 + 32 * 5 + 16,
         });
@@ -4238,7 +4056,12 @@ describe("data-editor", () => {
         prep();
         const canvas = screen.getByTestId("data-grid-canvas");
 
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 290,
+            clientY: 36 + 30,
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 290,
             clientY: 36 + 30,
         });
@@ -4259,11 +4082,6 @@ describe("data-editor", () => {
         });
 
         fireEvent.mouseUp(canvas, {
-            clientX: 308,
-            clientY: 995,
-        });
-
-        fireEvent.click(canvas, {
             clientX: 308,
             clientY: 995,
         });
@@ -4289,7 +4107,12 @@ describe("data-editor", () => {
         prep(false);
 
         const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
+        fireEvent.mouseDown(canvas, {
+            clientX: 300, // Col B
+            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
+        });
+
+        fireEvent.mouseUp(canvas, {
             clientX: 300, // Col B
             clientY: 36 + 32 + 16, // Row 1 (0 indexed)
         });
@@ -4319,71 +4142,5 @@ describe("data-editor", () => {
                 rangeStack: [],
             },
         });
-    });
-
-    test("Clear selection when suddenly out of range", async () => {
-        const spy = jest.fn();
-        jest.useFakeTimers();
-        const { rerender } = render(<EventedDataEditor {...basicProps} rows={10} onGridSelectionChange={spy} />, {
-            wrapper: Context,
-        });
-        prep(false);
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            clientX: 300,
-            clientY: 36 + 32 * 5 + 16,
-        });
-
-        jest.runAllTimers();
-        spy.mockClear();
-
-        rerender(<EventedDataEditor {...basicProps} rows={1} onGridSelectionChange={spy} />);
-
-        jest.runAllTimers();
-        expect(spy).toBeCalledWith({
-            columns: CompactSelection.empty(),
-            rows: CompactSelection.empty(),
-            current: undefined,
-        });
-    });
-
-    test("Enter key does not trigger disallowed row fetch", async () => {
-        const spy = jest.fn(basicProps.getCellContent);
-        jest.useFakeTimers();
-        render(
-            <EventedDataEditor
-                {...basicProps}
-                rows={2}
-                getCellContent={spy}
-                onRowAppended={jest.fn()}
-                trailingRowOptions={{
-                    sticky: true,
-                    tint: true,
-                }}
-            />,
-            {
-                wrapper: Context,
-            }
-        );
-        prep(false);
-
-        const canvas = screen.getByTestId("data-grid-canvas");
-        sendClick(canvas, {
-            clientX: 300, // Col B
-            clientY: 36 + 32 + 16, // Row 1 (0 indexed)
-        });
-
-        fireEvent.keyDown(canvas, {
-            key: "Enter",
-        });
-
-        spy.mockClear();
-        fireEvent.keyDown(canvas, {
-            key: "Enter",
-        });
-
-        jest.runAllTimers();
-        expect(spy.mock.calls.findIndex(x => x[0][1] > 1)).toBe(-1);
     });
 });

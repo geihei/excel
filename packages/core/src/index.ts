@@ -1,12 +1,10 @@
 export type { OverlayImageEditorProps } from "./data-grid-overlay-editor/private/image-overlay-editor";
 export type { MarkdownDivProps } from "./markdown-div/markdown-div";
-export type { SpriteMap, HeaderIcon, Sprite } from "./data-grid/data-grid-sprites";
-export type { SpriteProps } from "./common/utils";
+export type { SpriteMap } from "./data-grid/data-grid-sprites";
 export type { Theme } from "./common/styles";
 export type { CustomCellRenderer } from "./data-editor/use-custom-cells";
-export type { CustomRenderer, BaseDrawArgs, DrawArgs } from "./data-grid/cells/cell-types";
+export type { CustomRenderer } from "./data-grid/cells/cell-types";
 export type { SelectionBlending } from "./data-grid/use-selection-behavior";
-export type { GetRowThemeCallback } from "./data-grid/data-grid-render";
 
 export * from "./data-editor/data-editor";
 export * from "./data-grid/data-grid-types";

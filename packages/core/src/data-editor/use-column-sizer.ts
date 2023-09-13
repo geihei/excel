@@ -5,6 +5,7 @@ import type { GetCellRendererCallback } from "../data-grid/cells/cell-types";
 import {
     CellArray,
     GridCell,
+    GridCellKind,
     GridColumn,
     InnerGridColumn,
     isSizedGridColumn,
@@ -20,6 +21,8 @@ function measureCell(
     theme: Theme,
     getCellRenderer: GetCellRendererCallback
 ): number {
+    if (cell.kind === GridCellKind.Custom) return defaultSize;
+
     const r = getCellRenderer(cell);
     return r?.measure?.(ctx, cell, theme) ?? defaultSize;
 }
@@ -75,21 +78,15 @@ export function useColumnSizer(
     getCellsForSelectionRef.current = getCellsForSelection;
     themeRef.current = theme;
 
-    const [canvas, ctx] = React.useMemo(() => {
-        if (typeof window === "undefined") return [null, null];
+    const [ctx] = React.useState(() => {
+        if (typeof window === undefined) return null;
         const offscreen = document.createElement("canvas");
         offscreen.style["display"] = "none";
         offscreen.style["opacity"] = "0";
         offscreen.style["position"] = "fixed";
-        return [offscreen, offscreen.getContext("2d", { alpha: false })];
-    }, []);
-
-    React.useLayoutEffect(() => {
-        if (canvas) document.documentElement.append(canvas);
-        return () => {
-            canvas?.remove();
-        };
-    }, [canvas]);
+        document.documentElement.append(offscreen);
+        return offscreen.getContext("2d", { alpha: false });
+    });
 
     const memoMap = React.useRef<Record<string, number>>({});
 

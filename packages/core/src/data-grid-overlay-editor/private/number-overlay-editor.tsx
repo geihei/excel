@@ -5,15 +5,11 @@ import type { SelectionRange } from "../../data-grid/data-grid-types";
 import type { NumberFormatValues } from "react-number-format/types/types";
 
 interface Props {
-    readonly value: number | undefined;
-    readonly disabled?: boolean;
-    readonly onChange: (values: NumberFormatValues) => void;
-    readonly highlight: boolean;
-    readonly validatedSelection?: SelectionRange;
-    readonly fixedDecimals?: number;
-    readonly allowNegative?: boolean;
-    readonly thousandSeparator?: boolean | string;
-    readonly decimalSeparator?: string;
+    value: number | undefined;
+    disabled?: boolean;
+    onChange: (values: NumberFormatValues) => void;
+    highlight: boolean;
+    validatedSelection?: SelectionRange;
 }
 
 function getDecimalSeparator() {
@@ -30,7 +26,7 @@ function getThousandSeprator() {
 }
 
 const NumberOverlayEditor: React.FunctionComponent<Props> = p => {
-    const { value, onChange, disabled, highlight, validatedSelection, fixedDecimals, allowNegative, thousandSeparator, decimalSeparator } = p;
+    const { value, onChange, disabled, highlight, validatedSelection } = p;
 
     const inputRef = React.useRef<HTMLInputElement>();
 
@@ -51,10 +47,8 @@ const NumberOverlayEditor: React.FunctionComponent<Props> = p => {
                     e.target.setSelectionRange(highlight ? 0 : e.target.value.length, e.target.value.length)
                 }
                 disabled={disabled === true}
-                decimalScale={fixedDecimals}
-                allowNegative={allowNegative}
-                thousandSeparator={thousandSeparator ?? getThousandSeprator()}
-                decimalSeparator={decimalSeparator ?? getDecimalSeparator()}
+                thousandSeparator={getThousandSeprator()}
+                decimalSeparator={getDecimalSeparator()}
                 value={Object.is(value, -0) ? "-" : value ?? ""}
                 // decimalScale={3}
                 // prefix={"$"}

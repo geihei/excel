@@ -21,28 +21,24 @@ export const textCellRenderer: InternalCellRenderer<TextCell> = {
         ...c,
         data: "",
     }),
-    provideEditor: cell => ({
-        disablePadding: cell.allowWrapping === true,
-        editor: p => {
-            const { isHighlighted, onChange, value, validatedSelection } = p;
-            return (
-                <GrowingEntry
-                    style={cell.allowWrapping === true ? { padding: "3px 8.5px" } : undefined}
-                    highlight={isHighlighted}
-                    autoFocus={value.readonly !== true}
-                    disabled={value.readonly === true}
-                    altNewline={true}
-                    value={value.data}
-                    validatedSelection={validatedSelection}
-                    onChange={e =>
-                        onChange({
-                            ...value,
-                            data: e.target.value,
-                        })
-                    }
-                />
-            );
-        },
-    }),
+    provideEditor: () => p => {
+        const { isHighlighted, onChange, value, validatedSelection } = p;
+        return (
+            <GrowingEntry
+                highlight={isHighlighted}
+                autoFocus={value.readonly !== true}
+                disabled={value.readonly === true}
+                altNewline={true}
+                value={value.data}
+                validatedSelection={validatedSelection}
+                onChange={e =>
+                    onChange({
+                        ...value,
+                        data: e.target.value,
+                    })
+                }
+            />
+        );
+    },
     onPaste: (toPaste, cell) => (toPaste === cell.data ? undefined : { ...cell, data: toPaste }),
 };
