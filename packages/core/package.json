@@ -1,6 +1,6 @@
 {
-    "name": "@glideapps/glide-data-grid",
-    "version": "5.3.0",
+    "name": "@packages_gh/glide-data-grid-gh",
+    "version": "1.0.17",
     "description": "React data grid for beautifully displaying and editing large amounts of data with amazing performance.",
     "sideEffects": [
         "**/*.css"
@@ -30,11 +30,6 @@
         "test": "jest",
         "check-package": "package-check"
     },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/glideapps/glide-data-grid.git",
-        "directory": "packages/core"
-    },
     "keywords": [
         "react",
         "datagrid",
@@ -47,7 +42,7 @@
         "cell",
         "canvas"
     ],
-    "author": "Glide",
+    "author": "geihei",
     "license": "MIT",
     "bugs": {
         "url": "https://github.com/glideapps/glide-data-grid/issues"
